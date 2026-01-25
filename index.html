@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>nulKey | Stateless Vault</title>
     <!-- Manifest for PWA -->
     <link rel="manifest" href='data:application/json,{"name":"nulKey","short_name":"nulKey","description":"Stateless Password Generator","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/3064/3064155.png","sizes":"512x512","type":"image/png"}]}'>
@@ -24,10 +26,10 @@
             color: var(--text);
             margin: 0;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             min-height: 100vh;
-            padding: 20px;
+            padding: 40px 20px;
             overflow-x: hidden;
         }
 
@@ -39,7 +41,7 @@
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border);
             border-radius: 24px;
-            padding: 30px;
+            padding: 24px 30px 30px 30px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
@@ -254,10 +256,10 @@
 
         <button id="unlockBtn" onclick="unlockMaster()">Unlock with Biometrics</button>
 
-        <div class="input-group" style="margin-bottom: 10px;">
+        <div id="masterPwdContainer" class="input-group" style="margin-bottom: 10px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <label style="margin-bottom: 0;">MASTER PASSWORD + SALT</label>
-                <div style="display: flex; align-items: center;">
+                <div id="saveToggleContainer" style="display: flex; align-items: center;">
                     <span style="font-size: 10px; color: #94a3b8; margin-right: 8px; text-transform: uppercase; font-weight: 600;">Save</span>
                     <label class="switch" style="transform: scale(0.7); margin: 0; width: 40px; transform-origin: right center;">
                         <input type="checkbox" id="saveToggle">
@@ -268,7 +270,7 @@
             <input type="password" id="masterPwd" placeholder="">
         </div>
 
-        <div class="salt-keypad" style="margin-bottom: 20px;">
+        <div id="saltKeypadContainer" class="salt-keypad" style="margin-bottom: 20px;">
             <button class="salt-btn" onclick="toggleSalt(this, '🦊')">🦊</button>
             <button class="salt-btn" onclick="toggleSalt(this, '⚡')">⚡</button>
             <button class="salt-btn" onclick="toggleSalt(this, '🐧')">🐧</button>
@@ -367,7 +369,11 @@
 
         // UI Normalization
         document.getElementById('domain').addEventListener('input', (e) => {
-            e.target.value = e.target.value.toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
+            e.target.value = e.target.value.toLowerCase().replace(/^https?:\/\//, '').split('/')[0].trim();
+        });
+
+        document.getElementById('username').addEventListener('input', (e) => {
+            e.target.value = e.target.value.toLowerCase().trim();
         });
         
         // Ensure valid length input
@@ -394,7 +400,11 @@
                 const req = store.get('master_vault');
                 req.onsuccess = () => r(req.result);
             });
-            if (saved) document.getElementById('unlockBtn').style.display = 'block';
+            if (saved) {
+                document.getElementById('unlockBtn').style.display = 'block';
+                document.getElementById('masterPwdContainer').style.display = 'none';
+                document.getElementById('saltKeypadContainer').style.display = 'none';
+            }
 
             // PWA Service Worker Registration
             if ('serviceWorker' in navigator) {
@@ -491,8 +501,8 @@
 
         async function generatePassword() {
             const master = internalMaster || document.getElementById('masterPwd').value;
-            const domain = document.getElementById('domain').value;
-            const user = document.getElementById('username').value;
+            const domain = document.getElementById('domain').value.toLowerCase().trim();
+            const user = document.getElementById('username').value.toLowerCase().trim();
             const count = document.getElementById('counter').value;
             const save = document.getElementById('saveToggle').checked;
             
