@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
     <title>nulKey | Stateless Vault</title>
     <!-- Manifest for PWA -->
-    <link rel="manifest" href='data:application/json,{"name":"nulKey","short_name":"nulKey","description":"Stateless Password Generator","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/3064/3064155.png","sizes":"512x512","type":"image/png"}]}'>
+    <link rel="manifest" href='data:application/json,{"name":"nulKey","short_name":"nulKey","description":"Stateless Password Generator","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","icons":[{"src":"icon.png","sizes":"512x512","type":"image/png"}]}'>
     <meta name="theme-color" content="#0f172a">
     <style>
         :root {
@@ -26,10 +28,10 @@
             color: var(--text);
             margin: 0;
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             justify-content: center;
             min-height: 100vh;
-            padding: 40px 20px;
+            padding: 20px;
             overflow-x: hidden;
         }
 
@@ -41,14 +43,14 @@
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border);
             border-radius: 24px;
-            padding: 24px 30px 30px 30px;
+            padding: 24px 24px 24px 24px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
         h1 {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
-            margin: 0 0 24px 0;
+            margin: 0 0 20px 0;
             text-align: center;
             letter-spacing: -0.5px;
             background: linear-gradient(to right, #38bdf8, #818cf8);
@@ -56,7 +58,7 @@
             -webkit-text-fill-color: transparent;
         }
 
-        .input-group { margin-bottom: 20px; }
+        .input-group { margin-bottom: 16px; }
 
         label {
             display: block;
@@ -316,14 +318,14 @@
             </div>
         </div>
 
-        <div class="row" style="margin-top: 20px; gap: 10px; grid-template-columns: auto 1fr;">
+        <div class="row" style="margin-top: 15px; gap: 10px; grid-template-columns: auto 1fr;">
             <button id="advancedToggle" onclick="toggleAdvanced()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 12px 16px; font-size: 12px; width: auto; margin: 0; color: #94a3b8; border-radius: 12px; height: 50px; display: flex; align-items: center; justify-content: center;">
                 <span style="transform: rotate(90deg); font-size: 16px;">⚙️</span>
             </button>
             <button id="generateBtn" onclick="generatePassword()" style="margin: 0; height: 50px;">Generate Password</button>
         </div>
 
-        <div id="resultArea" class="result-container">
+        <div id="resultArea" class="result-container" style="margin-top: 15px;">
             <div class="result-label">
                 <span>Generated Password</span>
                 <span id="timerArea">Auto-clear in <span id="timer">60</span>s</span>
