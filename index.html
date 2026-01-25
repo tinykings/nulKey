@@ -406,6 +406,7 @@
                 document.getElementById('unlockBtn').style.display = 'block';
                 document.getElementById('masterPwdContainer').style.display = 'none';
                 document.getElementById('saltKeypadContainer').style.display = 'none';
+                unlockMaster();
             }
 
             // PWA Service Worker Registration
@@ -444,6 +445,11 @@
                     saltSelection = vault.salt || [];
                     
                     // Update UI
+                    const unlockBtn = document.getElementById('unlockBtn');
+                    unlockBtn.textContent = "Unlocked with Biometrics";
+                    unlockBtn.style.color = "#FFD700";
+                    unlockBtn.style.borderColor = "#FFD700";
+
                     document.getElementById('masterPwd').placeholder = "Vault Unlocked (Biometric)";
                     document.getElementById('masterPwd').value = "";
                     document.getElementById('masterPwd').disabled = true;
