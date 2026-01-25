@@ -184,6 +184,67 @@
         .copy-hint { font-size: 10px; opacity: 0.6; text-align: center; margin-top: 10px; }
         
         #timer { font-weight: bold; }
+
+        .options-grid {
+            display: flex;
+            justify-content: space-between;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .checkbox-label {
+            display: flex !important;
+            align-items: center;
+            margin: 0 !important;
+            color: var(--text) !important;
+            text-transform: none !important;
+            font-size: 13px !important;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .checkbox-label input {
+            width: 16px !important;
+            height: 16px !important;
+            margin-right: 6px !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            accent-color: var(--accent);
+        }
+
+        .salt-keypad {
+            display: flex;
+            justify-content: space-between;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        .salt-btn {
+            flex: 1;
+            padding: 8px 0;
+            margin: 0;
+            font-size: 18px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+            cursor: pointer;
+            transition: all 0.2s;
+            filter: grayscale(1);
+            opacity: 0.4;
+        }
+
+        .salt-btn.selected {
+            background: rgba(56, 189, 248, 0.2);
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+            filter: grayscale(0);
+            opacity: 1;
+        }
+
+        .salt-btn:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
@@ -193,36 +254,72 @@
 
         <button id="unlockBtn" onclick="unlockMaster()">Unlock with Biometrics</button>
 
-        <div class="input-group">
-            <label>Master Password</label>
-            <input type="password" id="masterPwd" placeholder="••••••••••••">
+        <div class="input-group" style="margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label style="margin-bottom: 0;">MASTER PASSWORD + SALT</label>
+                <div style="display: flex; align-items: center;">
+                    <span style="font-size: 10px; color: #94a3b8; margin-right: 8px; text-transform: uppercase; font-weight: 600;">Save</span>
+                    <label class="switch" style="transform: scale(0.7); margin: 0; width: 40px; transform-origin: right center;">
+                        <input type="checkbox" id="saveToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <input type="password" id="masterPwd" placeholder="">
+        </div>
+
+        <div class="salt-keypad" style="margin-bottom: 20px;">
+            <button class="salt-btn" onclick="toggleSalt(this, '🦊')">🦊</button>
+            <button class="salt-btn" onclick="toggleSalt(this, '⚡')">⚡</button>
+            <button class="salt-btn" onclick="toggleSalt(this, '🐧')">🐧</button>
+            <button class="salt-btn" onclick="toggleSalt(this, '👾')">👾</button>
+            <button class="salt-btn" onclick="toggleSalt(this, '🔥')">🔥</button>
+            <button class="salt-btn" onclick="toggleSalt(this, '🦖')">🦖</button>
+            <button class="salt-btn" onclick="toggleSalt(this, '💀')">💀</button>
+            <button class="salt-btn" onclick="toggleSalt(this, '🐙')">🐙</button>
+            <button class="salt-btn" onclick="toggleSalt(this, '🐒')">🐒</button>
+            <button class="salt-btn" onclick="toggleSalt(this, '🐝')">🐝</button>
         </div>
 
         <div class="input-group">
             <label>URL / Domain</label>
-            <input type="text" id="domain" placeholder="amazon.com" autocomplete="off">
+            <input type="text" id="domain" placeholder="" autocomplete="off">
         </div>
 
-        <div class="row">
-            <div class="input-group">
-                <label>Username</label>
-                <input type="text" id="username" placeholder="ryan" autocomplete="off">
+        <div class="input-group">
+            <label>Username</label>
+            <input type="text" id="username" placeholder="" autocomplete="off">
+        </div>
+
+        <div id="advancedOptions" style="display: none; animation: fadeIn 0.3s ease-out;">
+            <div class="row">
+                <div class="input-group">
+                    <label>Counter</label>
+                    <input type="number" id="counter" value="1" min="1">
+                </div>
+                <div class="input-group">
+                    <label>Password Length</label>
+                    <input type="number" id="pwLength" value="20" min="4" max="64">
+                </div>
             </div>
+
             <div class="input-group">
-                <label>Counter</label>
-                <input type="number" id="counter" value="1" min="1">
+                <label>Character Options</label>
+                <div class="options-grid">
+                    <label class="checkbox-label"><input type="checkbox" id="useLower" checked> a-z</label>
+                    <label class="checkbox-label"><input type="checkbox" id="useUpper" checked> A-Z</label>
+                    <label class="checkbox-label"><input type="checkbox" id="useNumbers" checked> 0-9</label>
+                    <label class="checkbox-label"><input type="checkbox" id="useSpecial" checked> %! @</label>
+                </div>
             </div>
         </div>
 
-        <div class="toggle-group">
-            <label style="margin:0; color: #fff;">Save Master Password</label>
-            <label class="switch">
-                <input type="checkbox" id="saveToggle">
-                <span class="slider"></span>
-            </label>
+        <div class="row" style="margin-top: 20px; gap: 10px; grid-template-columns: auto 1fr;">
+            <button id="advancedToggle" onclick="toggleAdvanced()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 12px 16px; font-size: 12px; width: auto; margin: 0; color: #94a3b8; border-radius: 12px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                <span style="transform: rotate(90deg); font-size: 16px;">⚙️</span>
+            </button>
+            <button id="generateBtn" onclick="generatePassword()" style="margin: 0; height: 50px;">Generate Password</button>
         </div>
-
-        <button id="generateBtn" onclick="generatePassword()">Generate Password</button>
 
         <div id="resultArea" class="result-container">
             <div class="result-label">
@@ -236,19 +333,48 @@
 
     <script>
         // CONFIGURATION
-        const SECRET_SALT = "$2a$12$K8x!P2#mQ9v&R5t*N3bZ^L7wJ4yC1xS0";
         const ITERATIONS = 150000;
-        const PW_LENGTH = 20;
         const DB_NAME = "nulKeyDB";
         const STORE_NAME = "vault";
 
         let currentPassword = "";
         let timerInterval = null;
         let internalMaster = "";
+        let saltSelection = [];
+
+        function toggleSalt(btn, char) {
+            const index = saltSelection.indexOf(char);
+            
+            if (index > -1) {
+                // Remove
+                saltSelection.splice(index, 1);
+                btn.classList.remove('selected');
+            } else {
+                // Add
+                if (saltSelection.length < 4) {
+                    saltSelection.push(char);
+                    btn.classList.add('selected');
+                } else {
+                    // Optional: Shake effect or visual feedback for max reached
+                    const keypad = document.querySelector('.salt-keypad');
+                    keypad.style.transform = "translateX(5px)";
+                    setTimeout(() => keypad.style.transform = "translateX(0)", 100);
+                    setTimeout(() => keypad.style.transform = "translateX(-5px)", 200);
+                    setTimeout(() => keypad.style.transform = "translateX(0)", 300);
+                }
+            }
+        }
 
         // UI Normalization
         document.getElementById('domain').addEventListener('input', (e) => {
             e.target.value = e.target.value.toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
+        });
+        
+        // Ensure valid length input
+        document.getElementById('pwLength').addEventListener('change', (e) => {
+             let val = parseInt(e.target.value);
+             if (val < 4) e.target.value = 4;
+             if (val > 128) e.target.value = 128;
         });
 
         // IndexedDB Helper
@@ -302,10 +428,22 @@
                 });
 
                 if (assertion) {
-                    internalMaster = vault.encrypted; 
+                    internalMaster = vault.encrypted;
+                    saltSelection = vault.salt || [];
+                    
+                    // Update UI
                     document.getElementById('masterPwd').placeholder = "Vault Unlocked (Biometric)";
                     document.getElementById('masterPwd').value = "";
                     document.getElementById('masterPwd').disabled = true;
+                    
+                    // Restore salt selection UI
+                    document.querySelectorAll('.salt-btn').forEach(btn => {
+                        if (saltSelection.includes(btn.textContent)) {
+                            btn.classList.add('selected');
+                        } else {
+                            btn.classList.remove('selected');
+                        }
+                    });
                 }
             } catch (err) {
                 console.error(err);
@@ -313,13 +451,25 @@
             }
         }
 
-        async function saveMaster(pwd) {
+        async function saveMaster(pwd, salt) {
             try {
+                if (!window.isSecureContext) {
+                    throw new Error("Biometrics require a secure context (HTTPS or localhost). Saving will not work on file:// origins.");
+                }
+
                 const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+                
+                // Dynamically set RP ID to hostname, or omit if on localhost/none
+                const rp = { name: "nulKey" };
+                const hostname = window.location.hostname;
+                if (hostname && hostname !== "localhost") {
+                    rp.id = hostname;
+                }
+
                 const credential = await navigator.credentials.create({
                     publicKey: {
                         challenge,
-                        rp: { name: "nulKey" },
+                        rp: rp,
                         user: { id: window.crypto.getRandomValues(new Uint8Array(16)), name: "user", displayName: "User" },
                         pubKeyCredParams: [{ alg: -7, type: "public-key" }],
                         authenticatorSelection: { userVerification: "required" }
@@ -330,10 +480,12 @@
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 tx.objectStore(STORE_NAME).put({
                     credId: credential.rawId,
-                    encrypted: pwd 
+                    encrypted: pwd,
+                    salt: salt
                 }, 'master_vault');
             } catch (err) {
                 console.error(err);
+                alert("Failed to save credentials: " + err.message);
             }
         }
 
@@ -343,22 +495,33 @@
             const user = document.getElementById('username').value;
             const count = document.getElementById('counter').value;
             const save = document.getElementById('saveToggle').checked;
+            
+            // Options
+            const length = parseInt(document.getElementById('pwLength').value) || 20;
+            const useUpper = document.getElementById('useUpper').checked;
+            const useLower = document.getElementById('useLower').checked;
+            const useNumbers = document.getElementById('useNumbers').checked;
+            const useSpecial = document.getElementById('useSpecial').checked;
 
             if (!master || !domain) return alert("Missing Master Password or Domain");
+            if (saltSelection.length !== 4) return alert("Please select 4 Secret Pattern symbols");
+            if (!useUpper && !useLower && !useNumbers && !useSpecial) return alert("Select at least one character type");
             
-            if (save && !internalMaster) await saveMaster(master);
+            if (save && !internalMaster) await saveMaster(master, saltSelection);
 
             const btn = document.getElementById('generateBtn');
             btn.disabled = true;
             btn.textContent = "Hashing...";
 
-            const saltStr = `${SECRET_SALT}${user}${domain}${count}`;
+            const userSalt = [...saltSelection].sort().join('');
+            const saltStr = `${userSalt}${user}${domain}${count}`;
             const encoder = new TextEncoder();
             
             const baseKey = await window.crypto.subtle.importKey(
                 "raw", encoder.encode(master), "PBKDF2", false, ["deriveBits"]
             );
 
+            // Derive enough bits for the requested length (8 bits per char)
             const derivedBits = await window.crypto.subtle.deriveBits(
                 {
                     name: "PBKDF2",
@@ -367,21 +530,26 @@
                     hash: "SHA-256"
                 },
                 baseKey,
-                256
+                length * 8
             );
 
             const hashArray = new Uint8Array(derivedBits);
-            currentPassword = formatPassword(hashArray);
+            currentPassword = formatPassword(hashArray, length, { useUpper, useLower, useNumbers, useSpecial });
             
             showResult();
             btn.disabled = false;
             btn.textContent = "Generate Password";
         }
 
-        function formatPassword(bytes) {
-            const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+";
+        function formatPassword(bytes, length, opts) {
+            let charset = "";
+            if (opts.useUpper) charset += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            if (opts.useLower) charset += "abcdefghijklmnopqrstuvwxyz";
+            if (opts.useNumbers) charset += "0123456789";
+            if (opts.useSpecial) charset += "!@#$%^&*()-_=+";
+
             let res = "";
-            for (let i = 0; i < PW_LENGTH; i++) {
+            for (let i = 0; i < length; i++) {
                 res += charset[bytes[i] % charset.length];
             }
             return res;
@@ -421,6 +589,22 @@
             const originalText = out.textContent;
             out.textContent = "COPIED!";
             setTimeout(() => out.textContent = originalText, 1000);
+        }
+
+        function toggleAdvanced() {
+            const el = document.getElementById('advancedOptions');
+            const btn = document.getElementById('advancedToggle');
+            if (el.style.display === 'none') {
+                el.style.display = 'block';
+                btn.style.color = 'var(--accent)';
+                btn.style.borderColor = 'var(--accent)';
+                btn.style.background = 'rgba(56, 189, 248, 0.1)';
+            } else {
+                el.style.display = 'none';
+                btn.style.color = '#94a3b8';
+                btn.style.borderColor = 'var(--glass-border)';
+                btn.style.background = 'rgba(255,255,255,0.05)';
+            }
         }
     </script>
 </body>
