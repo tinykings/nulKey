@@ -651,7 +651,7 @@
                 "raw", encoder.encode(master), "PBKDF2", false, ["deriveBits"]
             );
 
-            // Derive enough bits for selection + shuffling (min 64 bytes / 512 bits)
+            // Derive enough bits for selection + shuffling
             const derivedBits = await window.crypto.subtle.deriveBits(
                 {
                     name: "PBKDF2",
@@ -660,7 +660,7 @@
                     hash: "SHA-256"
                 },
                 baseKey,
-                Math.max(length * 16, 512)
+                Math.max(length * 32, 1024)
             );
 
             const hashArray = new Uint8Array(derivedBits);
@@ -680,27 +680,29 @@
 
             if (sets.length === 0) return "";
 
+            const targetLength = Math.max(length, sets.length);
             const allChars = sets.join("");
             let res = [];
+            let byteIdx = 0;
 
             // 1. Ensure one character from each selected set
             for (let i = 0; i < sets.length; i++) {
-                res.push(sets[i][bytes[i] % sets[i].length]);
+                const set = sets[i];
+                res.push(set[bytes[byteIdx++] % set.length]);
             }
 
             // 2. Fill the rest with the full charset
-            for (let i = sets.length; i < length; i++) {
-                res.push(allChars[bytes[i] % allChars.length]);
+            while (res.length < targetLength) {
+                res.push(allChars[bytes[byteIdx++] % allChars.length]);
             }
 
             // 3. Deterministically shuffle using extra bytes
-            let byteIdx = length;
             for (let i = res.length - 1; i > 0; i--) {
                 const j = bytes[byteIdx++] % (i + 1);
                 [res[i], res[j]] = [res[j], res[i]];
             }
 
-            return res.join("");
+            return res.slice(0, length).join("");
         }
 
         function showResult() {
