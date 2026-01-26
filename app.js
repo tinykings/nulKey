@@ -1,3 +1,8 @@
+// Trusted Types Policy
+const ttPolicy = window.trustedTypes ? window.trustedTypes.createPolicy('nulKeyPolicy', {
+    createScriptURL: (url) => url
+}) : { createScriptURL: (url) => url };
+
 // CONFIGURATION
 const ITERATIONS = 1000000;
 const DB_NAME = "nulKeyDB";
@@ -23,7 +28,8 @@ window.addEventListener('load', async () => {
 
     // PWA Service Worker Registration
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
+        const swUrl = ttPolicy.createScriptURL('sw.js');
+        navigator.serviceWorker.register(swUrl);
     }
 });
 
