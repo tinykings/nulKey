@@ -303,7 +303,7 @@
                 </div>
                 <div class="input-group">
                     <label>Password Length</label>
-                    <input type="number" id="pwLength" value="20" min="4" max="64">
+                    <input type="number" id="pwLength" value="14" min="4" max="64">
                 </div>
             </div>
 
@@ -313,7 +313,7 @@
                     <label class="checkbox-label"><input type="checkbox" id="useLower" checked> a-z</label>
                     <label class="checkbox-label"><input type="checkbox" id="useUpper" checked> A-Z</label>
                     <label class="checkbox-label"><input type="checkbox" id="useNumbers" checked> 0-9</label>
-                    <label class="checkbox-label"><input type="checkbox" id="useSpecial" checked> %! @</label>
+                    <label class="checkbox-label"><input type="checkbox" id="useSpecial" checked> ! @ # $</label>
                 </div>
             </div>
         </div>
@@ -515,7 +515,7 @@
             const save = document.getElementById('saveToggle').checked;
             
             // Options
-            const length = parseInt(document.getElementById('pwLength').value) || 20;
+            const length = parseInt(document.getElementById('pwLength').value) || 14;
             const useUpper = document.getElementById('useUpper').checked;
             const useLower = document.getElementById('useLower').checked;
             const useNumbers = document.getElementById('useNumbers').checked;
@@ -564,7 +564,7 @@
             if (opts.useUpper) charset += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
             if (opts.useLower) charset += "abcdefghijklmnopqrstuvwxyz";
             if (opts.useNumbers) charset += "0123456789";
-            if (opts.useSpecial) charset += "!@#$%^&*()-_=+";
+            if (opts.useSpecial) charset += "!@#$%^&*_-.";
 
             let res = "";
             for (let i = 0; i < length; i++) {
