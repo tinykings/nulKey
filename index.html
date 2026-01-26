@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; manifest-src 'self' data:;">
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <title>nulKey | Stateless Vault</title>
     <!-- Manifest for PWA -->
-    <link rel="manifest" href='data:application/json,{"name":"nulKey","short_name":"nulKey","description":"Stateless Password Generator","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","icons":[{"src":"icon.png","sizes":"512x512","type":"image/png"}]}'>
+    <link rel="manifest" href='data:application/json,%7B%22name%22%3A%22nulKey%22%2C%22short_name%22%3A%22nulKey%22%2C%22description%22%3A%22Stateless%20Password%20Generator%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%230f172a%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22icon.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D'>
     <meta name="theme-color" content="#0f172a">
     <style>
         :root {
@@ -261,13 +262,6 @@
         <div id="masterPwdContainer" class="input-group" style="margin-bottom: 10px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <label style="margin-bottom: 0;">MASTER PASSWORD + SALT</label>
-                <div id="saveToggleContainer" style="display: flex; align-items: center;">
-                    <span style="font-size: 10px; color: #94a3b8; margin-right: 8px; text-transform: uppercase; font-weight: 600;">Save</span>
-                    <label class="switch" style="transform: scale(0.7); margin: 0; width: 40px; transform-origin: right center;">
-                        <input type="checkbox" id="saveToggle">
-                        <span class="slider"></span>
-                    </label>
-                </div>
             </div>
             <input type="password" id="masterPwd" placeholder="">
         </div>
@@ -316,6 +310,12 @@
                     <label class="checkbox-label"><input type="checkbox" id="useSpecial" checked> ! @ # $</label>
                 </div>
             </div>
+
+            <div class="input-group" style="margin-top: 15px; border-top: 1px solid var(--glass-border); padding-top: 15px;">
+                <button id="passkeyActionBtn" onclick="togglePasskeyAction()" style="background: rgba(56, 189, 248, 0.1); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.2);">
+                    Enable Passkey
+                </button>
+            </div>
         </div>
 
         <div class="row" style="margin-top: 15px; gap: 10px; grid-template-columns: auto 1fr;">
@@ -337,7 +337,7 @@
 
     <script>
         // CONFIGURATION
-        const ITERATIONS = 150000;
+        const ITERATIONS = 1000000;
         const DB_NAME = "nulKeyDB";
         const STORE_NAME = "vault";
 
@@ -345,6 +345,88 @@
         let timerInterval = null;
         let internalMaster = "";
         let saltSelection = [];
+        let hasPasskey = false;
+
+        async function checkPasskeyStatus() {
+            const db = await getDB();
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const saved = await new Promise(r => {
+                const req = tx.objectStore(STORE_NAME).get('master_vault');
+                req.onsuccess = () => r(req.result);
+            });
+            
+            const btn = document.getElementById('passkeyActionBtn');
+            const unlockBtn = document.getElementById('unlockBtn');
+            
+            if (saved) {
+                hasPasskey = true;
+                btn.textContent = "Disable Passkey";
+                btn.style.background = "rgba(220, 38, 38, 0.2)";
+                btn.style.color = "#f87171";
+                btn.style.borderColor = "rgba(220, 38, 38, 0.3)";
+                unlockBtn.style.display = 'block';
+                document.getElementById('masterPwdContainer').style.display = 'none';
+                document.getElementById('saltKeypadContainer').style.display = 'none';
+            } else {
+                hasPasskey = false;
+                btn.textContent = "Enable Passkey";
+                btn.style.background = "rgba(56, 189, 248, 0.1)";
+                btn.style.color = "var(--accent)";
+                btn.style.borderColor = "rgba(56, 189, 248, 0.2)";
+                unlockBtn.style.display = 'none';
+                document.getElementById('masterPwdContainer').style.display = 'block';
+                document.getElementById('saltKeypadContainer').style.display = 'flex';
+            }
+        }
+
+        async function togglePasskeyAction() {
+            if (hasPasskey) {
+                await disablePasskey();
+            } else {
+                const master = document.getElementById('masterPwd').value;
+                if (!master || saltSelection.length !== 4) {
+                    alert("Enter Master Password and select 4 symbols first to enable Passkey.");
+                    return;
+                }
+                await saveMaster(master, saltSelection);
+            }
+            checkPasskeyStatus();
+        }
+
+        async function disablePasskey() {
+            if (!confirm("Are you sure you want to disable and remove the Passkey?")) return;
+
+            try {
+                const db = await getDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                await new Promise((resolve, reject) => {
+                    const req = tx.objectStore(STORE_NAME).delete('master_vault');
+                    req.onsuccess = resolve;
+                    req.onerror = reject;
+                });
+
+                // Clear internal state
+                internalMaster = "";
+                saltSelection = [];
+                document.querySelectorAll('.salt-btn').forEach(btn => btn.classList.remove('selected'));
+                document.getElementById('masterPwd').value = "";
+                document.getElementById('masterPwd').placeholder = "";
+                document.getElementById('masterPwd').disabled = false;
+                
+                // Reset Unlock Button State
+                const unlockBtn = document.getElementById('unlockBtn');
+                unlockBtn.textContent = "Unlock with Biometrics";
+                unlockBtn.style.color = "";
+                unlockBtn.style.borderColor = "";
+
+                // Close advanced options to show the change
+                toggleAdvanced();
+
+            } catch (err) {
+                console.error(err);
+                alert("Failed to remove passkey: " + err.message);
+            }
+        }
 
         function toggleSalt(btn, char) {
             const index = saltSelection.indexOf(char);
@@ -377,6 +459,13 @@
         document.getElementById('username').addEventListener('input', (e) => {
             e.target.value = e.target.value.toLowerCase().trim();
         });
+
+        // Clear fields on focus if they have content
+        ['domain', 'username'].forEach(id => {
+            document.getElementById(id).addEventListener('focus', (e) => {
+                if (e.target.value) e.target.value = '';
+            });
+        });
         
         // Ensure valid length input
         document.getElementById('pwLength').addEventListener('change', (e) => {
@@ -402,24 +491,25 @@
 
         // Biometric Check on Launch
         window.addEventListener('load', async () => {
+            await checkPasskeyStatus();
+            
+            // Restore last username
             const db = await getDB();
             const tx = db.transaction(STORE_NAME, 'readonly');
-            const store = tx.objectStore(STORE_NAME);
-            const saved = await new Promise(r => {
-                const req = store.get('master_vault');
+            const lastUser = await new Promise(r => {
+                const req = tx.objectStore(STORE_NAME).get('last_username');
                 req.onsuccess = () => r(req.result);
             });
-            if (saved) {
-                document.getElementById('unlockBtn').style.display = 'block';
-                document.getElementById('masterPwdContainer').style.display = 'none';
-                document.getElementById('saltKeypadContainer').style.display = 'none';
+            if (lastUser) document.getElementById('username').value = lastUser;
+
+            if (hasPasskey) {
                 unlockMaster();
             }
 
             // PWA Service Worker Registration
             if ('serviceWorker' in navigator) {
                 const swCode = `
-                    const CACHE = 'nulkey-v1';
+                    const CACHE = 'nulkey-v2';
                     self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.add('.'))));
                     self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
                 `;
@@ -447,9 +537,12 @@
                     }
                 });
 
-                if (assertion) {
-                    internalMaster = vault.encrypted;
-                    saltSelection = vault.salt || [];
+                if (assertion && assertion.response.userHandle) {
+                    const decoded = new TextDecoder().decode(assertion.response.userHandle);
+                    const data = JSON.parse(decoded);
+                    
+                    internalMaster = data.p;
+                    saltSelection = data.s || [];
                     
                     // Update UI
                     const unlockBtn = document.getElementById('unlockBtn');
@@ -472,14 +565,14 @@
                 }
             } catch (err) {
                 console.error(err);
-                alert("Biometric verification failed.");
+                // Do not alert on load, just let user try again or enter manually if it fails
             }
         }
 
         async function saveMaster(pwd, salt) {
             try {
                 if (!window.isSecureContext) {
-                    throw new Error("Biometrics require a secure context (HTTPS or localhost). Saving will not work on file:// origins.");
+                    throw new Error("Biometrics require a secure context (HTTPS or localhost).");
                 }
 
                 const challenge = window.crypto.getRandomValues(new Uint8Array(32));
@@ -491,26 +584,43 @@
                     rp.id = hostname;
                 }
 
+                // We store the master password and salt selection inside the user.id
+                // Note: user.id has a 64-byte limit. We'll use JSON.
+                const payload = JSON.stringify({ p: pwd, s: salt });
+                const userId = new TextEncoder().encode(payload);
+                
+                if (userId.length > 64) {
+                    throw new Error("Payload is too long to be stored in a Passkey. Try a shorter master password.");
+                }
+
                 const credential = await navigator.credentials.create({
                     publicKey: {
                         challenge,
                         rp: rp,
-                        user: { id: window.crypto.getRandomValues(new Uint8Array(16)), name: "user", displayName: "User" },
+                        user: { 
+                            id: userId, 
+                            name: "user-" + Date.now(), 
+                            displayName: "nulKey User" 
+                        },
                         pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                        authenticatorSelection: { userVerification: "required" }
+                        authenticatorSelection: { 
+                            userVerification: "required",
+                            residentKey: "required",
+                            requireResidentKey: true
+                        }
                     }
                 });
 
                 const db = await getDB();
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 tx.objectStore(STORE_NAME).put({
-                    credId: credential.rawId,
-                    encrypted: pwd,
-                    salt: salt
+                    credId: credential.rawId
                 }, 'master_vault');
+                
+                alert("Passkey enabled successfully.");
             } catch (err) {
                 console.error(err);
-                alert("Failed to save credentials: " + err.message);
+                alert("Failed to enable passkey: " + err.message);
             }
         }
 
@@ -519,7 +629,6 @@
             const domain = document.getElementById('domain').value.toLowerCase().trim();
             const user = document.getElementById('username').value.toLowerCase().trim();
             const count = document.getElementById('counter').value;
-            const save = document.getElementById('saveToggle').checked;
             
             // Options
             const length = parseInt(document.getElementById('pwLength').value) || 14;
@@ -532,7 +641,10 @@
             if (saltSelection.length !== 4) return alert("Please select 4 Secret Pattern symbols");
             if (!useUpper && !useLower && !useNumbers && !useSpecial) return alert("Select at least one character type");
             
-            if (save && !internalMaster) await saveMaster(master, saltSelection);
+            // Save username for next time
+            const db = await getDB();
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).put(user, 'last_username');
 
             const btn = document.getElementById('generateBtn');
             btn.disabled = true;
