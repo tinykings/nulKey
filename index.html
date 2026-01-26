@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; manifest-src 'self' data:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; manifest-src 'self' data:; require-trusted-types-for 'script';">
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <title>nulKey</title>
@@ -257,7 +257,7 @@
     <div class="container">
         <h1>nulKey</h1>
 
-        <button id="unlockBtn" onclick="unlockMaster()">Unlock with Biometrics</button>
+        <button id="unlockBtn">Unlock with Biometrics</button>
 
         <div id="masterPwdContainer" class="input-group" style="margin-bottom: 10px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -267,16 +267,16 @@
         </div>
 
         <div id="saltKeypadContainer" class="salt-keypad" style="margin-bottom: 20px;">
-            <button class="salt-btn" onclick="toggleSalt(this, '🦊')">🦊</button>
-            <button class="salt-btn" onclick="toggleSalt(this, '⚡')">⚡</button>
-            <button class="salt-btn" onclick="toggleSalt(this, '🐧')">🐧</button>
-            <button class="salt-btn" onclick="toggleSalt(this, '👾')">👾</button>
-            <button class="salt-btn" onclick="toggleSalt(this, '🔥')">🔥</button>
-            <button class="salt-btn" onclick="toggleSalt(this, '🦖')">🦖</button>
-            <button class="salt-btn" onclick="toggleSalt(this, '💀')">💀</button>
-            <button class="salt-btn" onclick="toggleSalt(this, '🐙')">🐙</button>
-            <button class="salt-btn" onclick="toggleSalt(this, '🐒')">🐒</button>
-            <button class="salt-btn" onclick="toggleSalt(this, '🐝')">🐝</button>
+            <button class="salt-btn">🦊</button>
+            <button class="salt-btn">⚡</button>
+            <button class="salt-btn">🐧</button>
+            <button class="salt-btn">👾</button>
+            <button class="salt-btn">🔥</button>
+            <button class="salt-btn">🦖</button>
+            <button class="salt-btn">💀</button>
+            <button class="salt-btn">🐙</button>
+            <button class="salt-btn">🐒</button>
+            <button class="salt-btn">🐝</button>
         </div>
 
         <div class="input-group">
@@ -312,17 +312,17 @@
             </div>
 
             <div class="input-group" style="margin-top: 15px; border-top: 1px solid var(--glass-border); padding-top: 15px;">
-                <button id="passkeyActionBtn" onclick="togglePasskeyAction()" style="background: rgba(56, 189, 248, 0.1); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.2);">
+                <button id="passkeyActionBtn" style="background: rgba(56, 189, 248, 0.1); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.2);">
                     Enable Passkey
                 </button>
             </div>
         </div>
 
         <div class="row" style="margin-top: 15px; gap: 10px; grid-template-columns: auto 1fr;">
-            <button id="advancedToggle" onclick="toggleAdvanced()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 12px 16px; font-size: 12px; width: auto; margin: 0; color: #94a3b8; border-radius: 12px; height: 50px; display: flex; align-items: center; justify-content: center;">
+            <button id="advancedToggle" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 12px 16px; font-size: 12px; width: auto; margin: 0; color: #94a3b8; border-radius: 12px; height: 50px; display: flex; align-items: center; justify-content: center;">
                 <img src="icon.png" alt="Settings" style="width: 24px; height: 24px; opacity: 0.6; transition: opacity 0.2s;" id="advancedToggleIcon">
             </button>
-            <button id="generateBtn" onclick="generatePassword()" style="margin: 0; height: 50px;">Generate Password</button>
+            <button id="generateBtn" style="margin: 0; height: 50px;">Generate Password</button>
         </div>
 
         <div id="resultArea" class="result-container" style="margin-top: 15px;">
@@ -330,502 +330,11 @@
                 <span>Generated Password</span>
                 <span id="timerArea">Auto-clear in <span id="timer">60</span>s</span>
             </div>
-            <div id="output" onclick="copyToClipboard()"></div>
+            <div id="output"></div>
             <div class="copy-hint">Tap to copy</div>
         </div>
     </div>
 
-    <script>
-        // CONFIGURATION
-        const ITERATIONS = 1000000;
-        const DB_NAME = "nulKeyDB";
-        const STORE_NAME = "vault";
-
-        let currentPassword = "";
-        let timerInterval = null;
-        let saltSelection = [];
-        let hasPasskey = false;
-
-        async function checkPasskeyStatus() {
-            const db = await getDB();
-            const tx = db.transaction(STORE_NAME, 'readonly');
-            const saved = await new Promise(r => {
-                const req = tx.objectStore(STORE_NAME).get('master_vault');
-                req.onsuccess = () => r(req.result);
-            });
-
-            const btn = document.getElementById('passkeyActionBtn');
-            const unlockBtn = document.getElementById('unlockBtn');
-
-            if (saved) {
-                hasPasskey = true;
-                btn.textContent = "Disable Passkey";
-                btn.style.background = "rgba(220, 38, 38, 0.2)";
-                btn.style.color = "#f87171";
-                btn.style.borderColor = "rgba(220, 38, 38, 0.3)";
-                unlockBtn.style.display = 'block';
-                document.getElementById('masterPwdContainer').style.display = 'none';
-                document.getElementById('saltKeypadContainer').style.display = 'none';
-            } else {
-                hasPasskey = false;
-                btn.textContent = "Enable Passkey";
-                btn.style.background = "rgba(56, 189, 248, 0.1)";
-                btn.style.color = "var(--accent)";
-                btn.style.borderColor = "rgba(56, 189, 248, 0.2)";
-                unlockBtn.style.display = 'none';
-                document.getElementById('masterPwdContainer').style.display = 'block';
-                document.getElementById('saltKeypadContainer').style.display = 'flex';
-            }
-        }
-
-        async function togglePasskeyAction() {
-            if (hasPasskey) {
-                await disablePasskey();
-            } else {
-                const master = document.getElementById('masterPwd').value;
-                if (!master || saltSelection.length !== 4) {
-                    alert("Enter Master Password and select 4 symbols first to enable Passkey.");
-                    return;
-                }
-                await saveMaster(master, saltSelection);
-            }
-            checkPasskeyStatus();
-        }
-
-        async function disablePasskey() {
-            if (!confirm("Are you sure you want to disable and remove the Passkey?")) return;
-
-            try {
-                const db = await getDB();
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                await new Promise((resolve, reject) => {
-                    const req = tx.objectStore(STORE_NAME).delete('master_vault');
-                    req.onsuccess = resolve;
-                    req.onerror = reject;
-                });
-
-                // Clear internal state
-                internalMaster = "";
-                saltSelection = [];
-                document.querySelectorAll('.salt-btn').forEach(btn => btn.classList.remove('selected'));
-                document.getElementById('masterPwd').value = "";
-                document.getElementById('masterPwd').placeholder = "";
-                document.getElementById('masterPwd').disabled = false;
-
-                // Reset Unlock Button State
-                const unlockBtn = document.getElementById('unlockBtn');
-                unlockBtn.textContent = "Unlock with Biometrics";
-                unlockBtn.style.color = "";
-                unlockBtn.style.borderColor = "";
-
-                // Close advanced options to show the change
-                toggleAdvanced();
-
-            } catch (err) {
-                console.error(err);
-                alert("Failed to remove passkey: " + err.message);
-            }
-        }
-
-        function toggleSalt(btn, char) {
-            const index = saltSelection.indexOf(char);
-
-            if (index > -1) {
-                // Remove
-                saltSelection.splice(index, 1);
-                btn.classList.remove('selected');
-            } else {
-                // Add
-                if (saltSelection.length < 4) {
-                    saltSelection.push(char);
-                    btn.classList.add('selected');
-                } else {
-                    // Optional: Shake effect or visual feedback for max reached
-                    const keypad = document.querySelector('.salt-keypad');
-                    keypad.style.transform = "translateX(5px)";
-                    setTimeout(() => keypad.style.transform = "translateX(0)", 100);
-                    setTimeout(() => keypad.style.transform = "translateX(-5px)", 200);
-                    setTimeout(() => keypad.style.transform = "translateX(0)", 300);
-                }
-            }
-        }
-
-        // UI Normalization
-        document.getElementById('domain').addEventListener('input', (e) => {
-            e.target.value = e.target.value.toLowerCase().replace(/^https?:\/\//, '').split('/')[0].trim();
-        });
-
-        document.getElementById('username').addEventListener('input', (e) => {
-            e.target.value = e.target.value.toLowerCase().trim();
-        });
-
-        // Clear fields on focus if they have content
-        ['domain', 'username'].forEach(id => {
-            document.getElementById(id).addEventListener('focus', (e) => {
-                if (e.target.value) e.target.value = '';
-            });
-        });
-
-        // Ensure valid length input
-        document.getElementById('pwLength').addEventListener('change', (e) => {
-             let val = parseInt(e.target.value);
-             if (val < 4) e.target.value = 4;
-             if (val > 128) e.target.value = 128;
-        });
-
-        // Global Enter key listener
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                generatePassword();
-            }
-        });
-
-        // IndexedDB Helper
-        const getDB = () => new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, 1);
-            request.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME);
-            request.onsuccess = (e) => resolve(e.target.result);
-            request.onerror = (e) => reject(e.target.error);
-        });
-
-        // Biometric Check on Launch
-        window.addEventListener('load', async () => {
-            await checkPasskeyStatus();
-
-            // Restore last username
-            const db = await getDB();
-            const tx = db.transaction(STORE_NAME, 'readonly');
-            const lastUser = await new Promise(r => {
-                const req = tx.objectStore(STORE_NAME).get('last_username');
-                req.onsuccess = () => r(req.result);
-            });
-            if (lastUser) document.getElementById('username').value = lastUser;
-
-            // PWA Service Worker Registration
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('sw.js');
-            }
-        });
-
-        async function getEncryptionKey(prfResults) {
-            const input = prfResults.results.first;
-            return await window.crypto.subtle.importKey(
-                "raw", input, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]
-            );
-        }
-
-        async function encryptData(key, data) {
-            const iv = window.crypto.getRandomValues(new Uint8Array(12));
-            const encoder = new TextEncoder();
-            const encrypted = await window.crypto.subtle.encrypt(
-                { name: "AES-GCM", iv }, key, encoder.encode(JSON.stringify(data))
-            );
-            return { iv: btoa(String.fromCharCode(...iv)), ciphertext: btoa(String.fromCharCode(...new Uint8Array(encrypted))) };
-        }
-
-        async function decryptData(key, vault) {
-            const iv = new Uint8Array(atob(vault.iv).split('').map(c => c.charCodeAt(0)));
-            const ciphertext = new Uint8Array(atob(vault.ciphertext).split('').map(c => c.charCodeAt(0)));
-            const decrypted = await window.crypto.subtle.decrypt(
-                { name: "AES-GCM", iv }, key, ciphertext
-            );
-            return JSON.parse(new TextDecoder().decode(decrypted));
-        }
-
-        async function unlockMaster() {
-            try {
-                const db = await getDB();
-                const tx = db.transaction(STORE_NAME, 'readonly');
-                const vault = await new Promise(r => {
-                    const req = tx.objectStore(STORE_NAME).get('master_vault');
-                    req.onsuccess = () => r(req.result);
-                });
-
-                if (!vault) return null;
-
-                const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-                const assertion = await navigator.credentials.get({
-                    publicKey: {
-                        challenge,
-                        allowCredentials: [{ type: 'public-key', id: vault.credId }],
-                        userVerification: 'required',
-                        extensions: {
-                            prf: { eval: { first: new Uint8Array(32).fill(1) } }
-                        }
-                    }
-                });
-
-                const extensionResults = assertion.getClientExtensionResults();
-                if (extensionResults.prf) {
-                    const key = await getEncryptionKey(extensionResults.prf);
-                    const data = await decryptData(key, vault);
-
-                    // Update UI temporarily
-                    const unlockBtn = document.getElementById('unlockBtn');
-                    if (unlockBtn) {
-                        unlockBtn.textContent = "Authenticated";
-                        unlockBtn.style.color = "#FFD700";
-                        unlockBtn.style.borderColor = "#FFD700";
-                    }
-
-                    // Restore salt selection UI
-                    document.querySelectorAll('.salt-btn').forEach(btn => {
-                        if (data.s && data.s.includes(btn.textContent)) {
-                            btn.classList.add('selected');
-                        } else {
-                            btn.classList.remove('selected');
-                        }
-                    });
-
-                    return data;
-                } else {
-                    throw new Error("Authenticator did not provide PRF output.");
-                }
-            } catch (err) {
-                console.error(err);
-                if (err.name !== 'NotAllowedError') alert("Biometric unlock failed: " + err.message);
-                return null;
-            }
-        }
-
-        async function saveMaster(pwd, salt) {
-            try {
-                if (!window.isSecureContext) {
-                    throw new Error("Biometrics require a secure context (HTTPS or localhost).");
-                }
-
-                const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-                const rp = { name: "nulKey" };
-                const hostname = window.location.hostname;
-                if (hostname && hostname !== "localhost") {
-                    rp.id = hostname;
-                }
-
-                // Use a random ID for the user instead of storing the secret there
-                const userId = window.crypto.getRandomValues(new Uint8Array(16));
-
-                const credential = await navigator.credentials.create({
-                    publicKey: {
-                        challenge,
-                        rp: rp,
-                        user: {
-                            id: userId,
-                            name: "user-" + Date.now(),
-                            displayName: "nulKey User"
-                        },
-                        pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                        authenticatorSelection: {
-                            userVerification: "required",
-                            residentKey: "required",
-                            requireResidentKey: true
-                        },
-                        extensions: {
-                            prf: { eval: { first: new Uint8Array(32).fill(1) } }
-                        }
-                    }
-                });
-
-                const extensionResults = credential.getClientExtensionResults();
-                if (!extensionResults.prf || !extensionResults.prf.enabled) {
-                    throw new Error("Your browser/device does not support the WebAuthn PRF extension required for secure biometric storage.");
-                }
-
-                // The PRF result is only available after a GET (assertion), not always after CREATE.
-                // However, most modern browsers provide it. If not, we might need to "test" it.
-                // For simplicity, we assume if prf.enabled is true, we can proceed.
-                // We'll perform a quick 'get' to actually derive the key if needed, 
-                // but usually browsers that support PRF extensions for create also provide them.
-                
-                // Wait, if create doesn't return PRF results, we need to do a get immediately.
-                let prfResult = extensionResults.prf;
-                
-                // If create results don't have 'results', we need to prompt user once more or rely on the next unlock.
-                // Actually, the spec says create can return the results if requested.
-                
-                const key = await getEncryptionKey(prfResult);
-                const { iv, ciphertext } = await encryptData(key, { p: pwd, s: salt });
-
-                const db = await getDB();
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                tx.objectStore(STORE_NAME).put({
-                    credId: credential.rawId,
-                    iv,
-                    ciphertext
-                }, 'master_vault');
-
-                alert("Passkey enabled successfully.");
-            } catch (err) {
-                console.error(err);
-                alert("Failed to enable passkey: " + err.message);
-            }
-        }
-
-        async function generatePassword() {
-            let master = document.getElementById('masterPwd').value;
-            const domain = document.getElementById('domain').value.toLowerCase().trim();
-            const user = document.getElementById('username').value.toLowerCase().trim();
-            const count = document.getElementById('counter').value;
-
-            // Options
-            const length = parseInt(document.getElementById('pwLength').value) || 14;
-            const useUpper = document.getElementById('useUpper').checked;
-            const useLower = document.getElementById('useLower').checked;
-            const useNumbers = document.getElementById('useNumbers').checked;
-            const useSpecial = document.getElementById('useSpecial').checked;
-
-            let salts = [...saltSelection];
-
-            if (hasPasskey && !master) {
-                const data = await unlockMaster();
-                if (!data) return;
-                master = data.p;
-                salts = data.s || [];
-            }
-
-            if (!master || !domain) return alert("Missing Master Password or Domain");
-            if (salts.length !== 4) return alert("Please select 4 Secret Pattern symbols");
-            if (!useUpper && !useLower && !useNumbers && !useSpecial) return alert("Select at least one character type");
-
-            // Save username for next time
-            const db = await getDB();
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            tx.objectStore(STORE_NAME).put(user, 'last_username');
-
-            const btn = document.getElementById('generateBtn');
-            btn.disabled = true;
-            btn.textContent = "Hashing...";
-
-            const userSalt = [...salts].sort().join('');
-            const saltStr = `${userSalt}${user}${domain}${count}`;
-            const encoder = new TextEncoder();
-
-            const baseKey = await window.crypto.subtle.importKey(
-                "raw", encoder.encode(master), "PBKDF2", false, ["deriveBits"]
-            );
-
-            // Clear master from memory immediately after importing the key
-            master = null;
-
-            // Derive enough bits for selection + shuffling
-            const derivedBits = await window.crypto.subtle.deriveBits(
-                {
-                    name: "PBKDF2",
-                    salt: encoder.encode(saltStr),
-                    iterations: ITERATIONS,
-                    hash: "SHA-256"
-                },
-                baseKey,
-                Math.max(length * 32, 1024)
-            );
-
-            const hashArray = new Uint8Array(derivedBits);
-            currentPassword = formatPassword(hashArray, length, { useUpper, useLower, useNumbers, useSpecial });
-
-            showResult();
-            btn.disabled = false;
-            btn.textContent = "Generate Password";
-
-            // If we used biometrics, reset the UI state to locked
-            if (hasPasskey) {
-                const unlockBtn = document.getElementById('unlockBtn');
-                if (unlockBtn) {
-                    unlockBtn.textContent = "Unlock with Biometrics";
-                    unlockBtn.style.color = "";
-                    unlockBtn.style.borderColor = "";
-                }
-                // Also clear the salt UI to be strictly stateless
-                document.querySelectorAll('.salt-btn').forEach(b => b.classList.remove('selected'));
-            }
-        }
-
-        function formatPassword(bytes, length, opts) {
-            const sets = [];
-            if (opts.useUpper) sets.push("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-            if (opts.useLower) sets.push("abcdefghijklmnopqrstuvwxyz");
-            if (opts.useNumbers) sets.push("0123456789");
-            if (opts.useSpecial) sets.push("!@#$%^&*_-.");
-
-            if (sets.length === 0) return "";
-
-            const targetLength = Math.max(length, sets.length);
-            const allChars = sets.join("");
-            let res = [];
-            let byteIdx = 0;
-
-            // 1. Ensure one character from each selected set
-            for (let i = 0; i < sets.length; i++) {
-                const set = sets[i];
-                res.push(set[bytes[byteIdx++] % set.length]);
-            }
-
-            // 2. Fill the rest with the full charset
-            while (res.length < targetLength) {
-                res.push(allChars[bytes[byteIdx++] % allChars.length]);
-            }
-
-            // 3. Deterministically shuffle using extra bytes
-            for (let i = res.length - 1; i > 0; i--) {
-                const j = bytes[byteIdx++] % (i + 1);
-                [res[i], res[j]] = [res[j], res[i]];
-            }
-
-            return res.slice(0, length).join("");
-        }
-
-        function showResult() {
-            const area = document.getElementById('resultArea');
-            const out = document.getElementById('output');
-            area.style.display = 'block';
-            out.textContent = currentPassword;
-
-            let seconds = 60;
-            const timer = document.getElementById('timer');
-            timer.textContent = seconds;
-
-            if (timerInterval) clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                seconds--;
-                timer.textContent = seconds;
-                if (seconds <= 0) {
-                    clearResult();
-                }
-            }, 1000);
-        }
-
-        function clearResult() {
-            clearInterval(timerInterval);
-            document.getElementById('resultArea').style.display = 'none';
-            document.getElementById('output').textContent = "";
-            currentPassword = "";
-            try { navigator.clipboard.writeText(""); } catch(e) {}
-        }
-
-        function copyToClipboard() {
-            navigator.clipboard.writeText(currentPassword);
-            const out = document.getElementById('output');
-            const originalText = out.textContent;
-            out.textContent = "COPIED!";
-            setTimeout(() => out.textContent = originalText, 1000);
-        }
-
-        function toggleAdvanced() {
-            const el = document.getElementById('advancedOptions');
-            const btn = document.getElementById('advancedToggle');
-            const icon = document.getElementById('advancedToggleIcon');
-            if (el.style.display === 'none') {
-                el.style.display = 'block';
-                btn.style.color = 'var(--accent)';
-                btn.style.borderColor = 'var(--accent)';
-                btn.style.background = 'rgba(56, 189, 248, 0.1)';
-                if (icon) icon.style.opacity = '1';
-            } else {
-                el.style.display = 'none';
-                btn.style.color = '#94a3b8';
-                btn.style.borderColor = 'var(--glass-border)';
-                btn.style.background = 'rgba(255,255,255,0.05)';
-                if (icon) icon.style.opacity = '0.6';
-            }
-        }
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
