@@ -90,6 +90,10 @@ async function checkPasskeyStatus() {
         unlockBtn.style.display = 'block';
         document.getElementById('masterPwdContainer').style.display = 'none';
         document.getElementById('saltKeypadContainer').style.display = 'none';
+
+        // Clear salt selection when in passkey mode to avoid confusion
+        saltSelection = [];
+        document.querySelectorAll('.salt-btn').forEach(b => b.classList.remove('selected'));
     } else {
         hasPasskey = false;
         btn.textContent = "Enable Passkey";
@@ -236,14 +240,6 @@ async function unlockMaster() {
                 unlockBtn.style.color = "#FFD700";
                 unlockBtn.style.borderColor = "#FFD700";
             }
-
-            document.querySelectorAll('.salt-btn').forEach(btn => {
-                if (data.s && data.s.includes(btn.textContent)) {
-                    btn.classList.add('selected');
-                } else {
-                    btn.classList.remove('selected');
-                }
-            });
 
             return data;
         } else {
