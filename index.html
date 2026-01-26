@@ -385,6 +385,13 @@
              if (val > 128) e.target.value = 128;
         });
 
+        // Global Enter key listener
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                generatePassword();
+            }
+        });
+
         // IndexedDB Helper
         const getDB = () => new Promise((resolve, reject) => {
             const request = indexedDB.open(DB_NAME, 1);
