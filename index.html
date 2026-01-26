@@ -22,7 +22,7 @@
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: radial-gradient(circle at top left, #1e293b, #0f172a);
@@ -187,7 +187,7 @@
         }
 
         .copy-hint { font-size: 10px; opacity: 0.6; text-align: center; margin-top: 10px; }
-        
+
         #timer { font-weight: bold; }
 
         .options-grid {
@@ -354,10 +354,10 @@
                 const req = tx.objectStore(STORE_NAME).get('master_vault');
                 req.onsuccess = () => r(req.result);
             });
-            
+
             const btn = document.getElementById('passkeyActionBtn');
             const unlockBtn = document.getElementById('unlockBtn');
-            
+
             if (saved) {
                 hasPasskey = true;
                 btn.textContent = "Disable Passkey";
@@ -412,7 +412,7 @@
                 document.getElementById('masterPwd').value = "";
                 document.getElementById('masterPwd').placeholder = "";
                 document.getElementById('masterPwd').disabled = false;
-                
+
                 // Reset Unlock Button State
                 const unlockBtn = document.getElementById('unlockBtn');
                 unlockBtn.textContent = "Unlock with Biometrics";
@@ -430,7 +430,7 @@
 
         function toggleSalt(btn, char) {
             const index = saltSelection.indexOf(char);
-            
+
             if (index > -1) {
                 // Remove
                 saltSelection.splice(index, 1);
@@ -466,7 +466,7 @@
                 if (e.target.value) e.target.value = '';
             });
         });
-        
+
         // Ensure valid length input
         document.getElementById('pwLength').addEventListener('change', (e) => {
              let val = parseInt(e.target.value);
@@ -492,7 +492,7 @@
         // Biometric Check on Launch
         window.addEventListener('load', async () => {
             await checkPasskeyStatus();
-            
+
             // Restore last username
             const db = await getDB();
             const tx = db.transaction(STORE_NAME, 'readonly');
@@ -533,10 +533,10 @@
                 if (assertion && assertion.response.userHandle) {
                     const decoded = new TextDecoder().decode(assertion.response.userHandle);
                     const data = JSON.parse(decoded);
-                    
+
                     internalMaster = data.p;
                     saltSelection = data.s || [];
-                    
+
                     // Update UI
                     const unlockBtn = document.getElementById('unlockBtn');
                     unlockBtn.textContent = "Unlocked with Biometrics";
@@ -546,7 +546,7 @@
                     document.getElementById('masterPwd').placeholder = "Vault Unlocked (Biometric)";
                     document.getElementById('masterPwd').value = "";
                     document.getElementById('masterPwd').disabled = true;
-                    
+
                     // Restore salt selection UI
                     document.querySelectorAll('.salt-btn').forEach(btn => {
                         if (saltSelection.includes(btn.textContent)) {
@@ -569,7 +569,7 @@
                 }
 
                 const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-                
+
                 // Dynamically set RP ID to hostname, or omit if on localhost/none
                 const rp = { name: "nulKey" };
                 const hostname = window.location.hostname;
@@ -581,7 +581,7 @@
                 // Note: user.id has a 64-byte limit. We'll use JSON.
                 const payload = JSON.stringify({ p: pwd, s: salt });
                 const userId = new TextEncoder().encode(payload);
-                
+
                 if (userId.length > 64) {
                     throw new Error("Payload is too long to be stored in a Passkey. Try a shorter master password.");
                 }
@@ -590,13 +590,13 @@
                     publicKey: {
                         challenge,
                         rp: rp,
-                        user: { 
-                            id: userId, 
-                            name: "user-" + Date.now(), 
-                            displayName: "nulKey User" 
+                        user: {
+                            id: userId,
+                            name: "user-" + Date.now(),
+                            displayName: "nulKey User"
                         },
                         pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                        authenticatorSelection: { 
+                        authenticatorSelection: {
                             userVerification: "required",
                             residentKey: "required",
                             requireResidentKey: true
@@ -609,7 +609,7 @@
                 tx.objectStore(STORE_NAME).put({
                     credId: credential.rawId
                 }, 'master_vault');
-                
+
                 alert("Passkey enabled successfully.");
             } catch (err) {
                 console.error(err);
@@ -622,7 +622,7 @@
             const domain = document.getElementById('domain').value.toLowerCase().trim();
             const user = document.getElementById('username').value.toLowerCase().trim();
             const count = document.getElementById('counter').value;
-            
+
             // Options
             const length = parseInt(document.getElementById('pwLength').value) || 14;
             const useUpper = document.getElementById('useUpper').checked;
@@ -633,7 +633,7 @@
             if (!master || !domain) return alert("Missing Master Password or Domain");
             if (saltSelection.length !== 4) return alert("Please select 4 Secret Pattern symbols");
             if (!useUpper && !useLower && !useNumbers && !useSpecial) return alert("Select at least one character type");
-            
+
             // Save username for next time
             const db = await getDB();
             const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -646,12 +646,12 @@
             const userSalt = [...saltSelection].sort().join('');
             const saltStr = `${userSalt}${user}${domain}${count}`;
             const encoder = new TextEncoder();
-            
+
             const baseKey = await window.crypto.subtle.importKey(
                 "raw", encoder.encode(master), "PBKDF2", false, ["deriveBits"]
             );
 
-            // Derive enough bits for the requested length (8 bits per char)
+            // Derive enough bits for selection + shuffling (min 64 bytes / 512 bits)
             const derivedBits = await window.crypto.subtle.deriveBits(
                 {
                     name: "PBKDF2",
@@ -660,29 +660,47 @@
                     hash: "SHA-256"
                 },
                 baseKey,
-                length * 8
+                Math.max(length * 16, 512)
             );
 
             const hashArray = new Uint8Array(derivedBits);
             currentPassword = formatPassword(hashArray, length, { useUpper, useLower, useNumbers, useSpecial });
-            
+
             showResult();
             btn.disabled = false;
             btn.textContent = "Generate Password";
         }
 
         function formatPassword(bytes, length, opts) {
-            let charset = "";
-            if (opts.useUpper) charset += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            if (opts.useLower) charset += "abcdefghijklmnopqrstuvwxyz";
-            if (opts.useNumbers) charset += "0123456789";
-            if (opts.useSpecial) charset += "!@#$%^&*_-.";
+            const sets = [];
+            if (opts.useUpper) sets.push("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+            if (opts.useLower) sets.push("abcdefghijklmnopqrstuvwxyz");
+            if (opts.useNumbers) sets.push("0123456789");
+            if (opts.useSpecial) sets.push("!@#$%^&*_-.");
 
-            let res = "";
-            for (let i = 0; i < length; i++) {
-                res += charset[bytes[i] % charset.length];
+            if (sets.length === 0) return "";
+
+            const allChars = sets.join("");
+            let res = [];
+
+            // 1. Ensure one character from each selected set
+            for (let i = 0; i < sets.length; i++) {
+                res.push(sets[i][bytes[i] % sets[i].length]);
             }
-            return res;
+
+            // 2. Fill the rest with the full charset
+            for (let i = sets.length; i < length; i++) {
+                res.push(allChars[bytes[i] % allChars.length]);
+            }
+
+            // 3. Deterministically shuffle using extra bytes
+            let byteIdx = length;
+            for (let i = res.length - 1; i > 0; i--) {
+                const j = bytes[byteIdx++] % (i + 1);
+                [res[i], res[j]] = [res[j], res[i]];
+            }
+
+            return res.join("");
         }
 
         function showResult() {
