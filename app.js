@@ -48,12 +48,6 @@ document.getElementById('username').addEventListener('input', (e) => {
     e.target.value = e.target.value.toLowerCase().trim();
 });
 
-['domain', 'username'].forEach(id => {
-    document.getElementById(id).addEventListener('focus', (e) => {
-        if (e.target.value) e.target.value = '';
-    });
-});
-
 document.getElementById('pwLength').addEventListener('change', (e) => {
      let val = parseInt(e.target.value);
      if (val < 4) e.target.value = 4;
@@ -62,7 +56,6 @@ document.getElementById('pwLength').addEventListener('change', (e) => {
 
 // Expose functions to the global scope for inline event handlers (though we should ideally migrate those too)
 // To comply with strict CSP, we'll attach them manually here.
-document.getElementById('unlockBtn').onclick = () => unlockMaster();
 document.getElementById('passkeyActionBtn').onclick = () => togglePasskeyAction();
 document.getElementById('advancedToggle').onclick = () => toggleAdvanced();
 document.getElementById('generateBtn').onclick = () => generatePassword();
@@ -85,7 +78,6 @@ async function checkPasskeyStatus() {
     });
 
     const btn = document.getElementById('passkeyActionBtn');
-    const unlockBtn = document.getElementById('unlockBtn');
 
     if (saved) {
         hasPasskey = true;
@@ -93,7 +85,6 @@ async function checkPasskeyStatus() {
         btn.style.background = "rgba(220, 38, 38, 0.2)";
         btn.style.color = "#f87171";
         btn.style.borderColor = "rgba(220, 38, 38, 0.3)";
-        unlockBtn.style.display = 'block';
         document.getElementById('masterPwdContainer').style.display = 'none';
         document.getElementById('saltKeypadContainer').style.display = 'none';
 
@@ -106,7 +97,6 @@ async function checkPasskeyStatus() {
         btn.style.background = "rgba(56, 189, 248, 0.1)";
         btn.style.color = "var(--accent)";
         btn.style.borderColor = "rgba(56, 189, 248, 0.2)";
-        unlockBtn.style.display = 'none';
         document.getElementById('masterPwdContainer').style.display = 'block';
         document.getElementById('saltKeypadContainer').style.display = 'flex';
     }
@@ -145,11 +135,10 @@ async function disablePasskey() {
         document.getElementById('masterPwd').placeholder = "";
         document.getElementById('masterPwd').disabled = false;
 
-        // Reset Unlock Button State
-        const unlockBtn = document.getElementById('unlockBtn');
-        unlockBtn.textContent = "Unlock with Biometrics";
-        unlockBtn.style.color = "";
-        unlockBtn.style.borderColor = "";
+        // Reset Master Password state
+        document.getElementById('masterPwd').value = "";
+        document.getElementById('masterPwd').placeholder = "";
+        document.getElementById('masterPwd').disabled = false;
 
         // Close advanced options to show the change
         toggleAdvanced();
@@ -239,13 +228,6 @@ async function unlockMaster() {
         if (extensionResults.prf) {
             const key = await getEncryptionKey(extensionResults.prf);
             const data = await decryptData(key, vault);
-
-            const unlockBtn = document.getElementById('unlockBtn');
-            if (unlockBtn) {
-                unlockBtn.textContent = "Authenticated";
-                unlockBtn.style.color = "#FFD700";
-                unlockBtn.style.borderColor = "#FFD700";
-            }
 
             return data;
         } else {
@@ -381,12 +363,6 @@ async function generatePassword() {
     btn.textContent = "Generate Password";
 
     if (hasPasskey) {
-        const unlockBtn = document.getElementById('unlockBtn');
-        if (unlockBtn) {
-            unlockBtn.textContent = "Unlock with Biometrics";
-            unlockBtn.style.color = "";
-            unlockBtn.style.borderColor = "";
-        }
         document.querySelectorAll('.salt-btn').forEach(b => b.classList.remove('selected'));
         saltSelection = [];
     }
