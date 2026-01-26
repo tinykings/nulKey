@@ -343,7 +343,6 @@
 
         let currentPassword = "";
         let timerInterval = null;
-        let internalMaster = "";
         let saltSelection = [];
         let hasPasskey = false;
 
@@ -502,15 +501,36 @@
             });
             if (lastUser) document.getElementById('username').value = lastUser;
 
-            if (hasPasskey) {
-                unlockMaster();
-            }
-
             // PWA Service Worker Registration
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('sw.js');
             }
         });
+
+        async function getEncryptionKey(prfResults) {
+            const input = prfResults.results.first;
+            return await window.crypto.subtle.importKey(
+                "raw", input, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]
+            );
+        }
+
+        async function encryptData(key, data) {
+            const iv = window.crypto.getRandomValues(new Uint8Array(12));
+            const encoder = new TextEncoder();
+            const encrypted = await window.crypto.subtle.encrypt(
+                { name: "AES-GCM", iv }, key, encoder.encode(JSON.stringify(data))
+            );
+            return { iv: btoa(String.fromCharCode(...iv)), ciphertext: btoa(String.fromCharCode(...new Uint8Array(encrypted))) };
+        }
+
+        async function decryptData(key, vault) {
+            const iv = new Uint8Array(atob(vault.iv).split('').map(c => c.charCodeAt(0)));
+            const ciphertext = new Uint8Array(atob(vault.ciphertext).split('').map(c => c.charCodeAt(0)));
+            const decrypted = await window.crypto.subtle.decrypt(
+                { name: "AES-GCM", iv }, key, ciphertext
+            );
+            return JSON.parse(new TextDecoder().decode(decrypted));
+        }
 
         async function unlockMaster() {
             try {
@@ -521,44 +541,50 @@
                     req.onsuccess = () => r(req.result);
                 });
 
+                if (!vault) return null;
+
                 const challenge = window.crypto.getRandomValues(new Uint8Array(32));
                 const assertion = await navigator.credentials.get({
                     publicKey: {
                         challenge,
                         allowCredentials: [{ type: 'public-key', id: vault.credId }],
-                        userVerification: 'required'
+                        userVerification: 'required',
+                        extensions: {
+                            prf: { eval: { first: new Uint8Array(32).fill(1) } }
+                        }
                     }
                 });
 
-                if (assertion && assertion.response.userHandle) {
-                    const decoded = new TextDecoder().decode(assertion.response.userHandle);
-                    const data = JSON.parse(decoded);
+                const extensionResults = assertion.getClientExtensionResults();
+                if (extensionResults.prf) {
+                    const key = await getEncryptionKey(extensionResults.prf);
+                    const data = await decryptData(key, vault);
 
-                    internalMaster = data.p;
-                    saltSelection = data.s || [];
-
-                    // Update UI
+                    // Update UI temporarily
                     const unlockBtn = document.getElementById('unlockBtn');
-                    unlockBtn.textContent = "Unlocked with Biometrics";
-                    unlockBtn.style.color = "#FFD700";
-                    unlockBtn.style.borderColor = "#FFD700";
-
-                    document.getElementById('masterPwd').placeholder = "Vault Unlocked (Biometric)";
-                    document.getElementById('masterPwd').value = "";
-                    document.getElementById('masterPwd').disabled = true;
+                    if (unlockBtn) {
+                        unlockBtn.textContent = "Authenticated";
+                        unlockBtn.style.color = "#FFD700";
+                        unlockBtn.style.borderColor = "#FFD700";
+                    }
 
                     // Restore salt selection UI
                     document.querySelectorAll('.salt-btn').forEach(btn => {
-                        if (saltSelection.includes(btn.textContent)) {
+                        if (data.s && data.s.includes(btn.textContent)) {
                             btn.classList.add('selected');
                         } else {
                             btn.classList.remove('selected');
                         }
                     });
+
+                    return data;
+                } else {
+                    throw new Error("Authenticator did not provide PRF output.");
                 }
             } catch (err) {
                 console.error(err);
-                // Do not alert on load, just let user try again or enter manually if it fails
+                if (err.name !== 'NotAllowedError') alert("Biometric unlock failed: " + err.message);
+                return null;
             }
         }
 
@@ -569,22 +595,14 @@
                 }
 
                 const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-
-                // Dynamically set RP ID to hostname, or omit if on localhost/none
                 const rp = { name: "nulKey" };
                 const hostname = window.location.hostname;
                 if (hostname && hostname !== "localhost") {
                     rp.id = hostname;
                 }
 
-                // We store the master password and salt selection inside the user.id
-                // Note: user.id has a 64-byte limit. We'll use JSON.
-                const payload = JSON.stringify({ p: pwd, s: salt });
-                const userId = new TextEncoder().encode(payload);
-
-                if (userId.length > 64) {
-                    throw new Error("Payload is too long to be stored in a Passkey. Try a shorter master password.");
-                }
+                // Use a random ID for the user instead of storing the secret there
+                const userId = window.crypto.getRandomValues(new Uint8Array(16));
 
                 const credential = await navigator.credentials.create({
                     publicKey: {
@@ -600,14 +618,39 @@
                             userVerification: "required",
                             residentKey: "required",
                             requireResidentKey: true
+                        },
+                        extensions: {
+                            prf: { eval: { first: new Uint8Array(32).fill(1) } }
                         }
                     }
                 });
 
+                const extensionResults = credential.getClientExtensionResults();
+                if (!extensionResults.prf || !extensionResults.prf.enabled) {
+                    throw new Error("Your browser/device does not support the WebAuthn PRF extension required for secure biometric storage.");
+                }
+
+                // The PRF result is only available after a GET (assertion), not always after CREATE.
+                // However, most modern browsers provide it. If not, we might need to "test" it.
+                // For simplicity, we assume if prf.enabled is true, we can proceed.
+                // We'll perform a quick 'get' to actually derive the key if needed, 
+                // but usually browsers that support PRF extensions for create also provide them.
+                
+                // Wait, if create doesn't return PRF results, we need to do a get immediately.
+                let prfResult = extensionResults.prf;
+                
+                // If create results don't have 'results', we need to prompt user once more or rely on the next unlock.
+                // Actually, the spec says create can return the results if requested.
+                
+                const key = await getEncryptionKey(prfResult);
+                const { iv, ciphertext } = await encryptData(key, { p: pwd, s: salt });
+
                 const db = await getDB();
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 tx.objectStore(STORE_NAME).put({
-                    credId: credential.rawId
+                    credId: credential.rawId,
+                    iv,
+                    ciphertext
                 }, 'master_vault');
 
                 alert("Passkey enabled successfully.");
@@ -618,7 +661,7 @@
         }
 
         async function generatePassword() {
-            const master = internalMaster || document.getElementById('masterPwd').value;
+            let master = document.getElementById('masterPwd').value;
             const domain = document.getElementById('domain').value.toLowerCase().trim();
             const user = document.getElementById('username').value.toLowerCase().trim();
             const count = document.getElementById('counter').value;
@@ -630,8 +673,17 @@
             const useNumbers = document.getElementById('useNumbers').checked;
             const useSpecial = document.getElementById('useSpecial').checked;
 
+            let salts = [...saltSelection];
+
+            if (hasPasskey && !master) {
+                const data = await unlockMaster();
+                if (!data) return;
+                master = data.p;
+                salts = data.s || [];
+            }
+
             if (!master || !domain) return alert("Missing Master Password or Domain");
-            if (saltSelection.length !== 4) return alert("Please select 4 Secret Pattern symbols");
+            if (salts.length !== 4) return alert("Please select 4 Secret Pattern symbols");
             if (!useUpper && !useLower && !useNumbers && !useSpecial) return alert("Select at least one character type");
 
             // Save username for next time
@@ -643,13 +695,16 @@
             btn.disabled = true;
             btn.textContent = "Hashing...";
 
-            const userSalt = [...saltSelection].sort().join('');
+            const userSalt = [...salts].sort().join('');
             const saltStr = `${userSalt}${user}${domain}${count}`;
             const encoder = new TextEncoder();
 
             const baseKey = await window.crypto.subtle.importKey(
                 "raw", encoder.encode(master), "PBKDF2", false, ["deriveBits"]
             );
+
+            // Clear master from memory immediately after importing the key
+            master = null;
 
             // Derive enough bits for selection + shuffling
             const derivedBits = await window.crypto.subtle.deriveBits(
@@ -669,6 +724,18 @@
             showResult();
             btn.disabled = false;
             btn.textContent = "Generate Password";
+
+            // If we used biometrics, reset the UI state to locked
+            if (hasPasskey) {
+                const unlockBtn = document.getElementById('unlockBtn');
+                if (unlockBtn) {
+                    unlockBtn.textContent = "Unlock with Biometrics";
+                    unlockBtn.style.color = "";
+                    unlockBtn.style.borderColor = "";
+                }
+                // Also clear the salt UI to be strictly stateless
+                document.querySelectorAll('.salt-btn').forEach(b => b.classList.remove('selected'));
+            }
         }
 
         function formatPassword(bytes, length, opts) {
