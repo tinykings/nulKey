@@ -7,6 +7,16 @@ const ttPolicy = window.trustedTypes ? window.trustedTypes.createPolicy('nulKeyP
 const ITERATIONS = 1000000;
 const DB_NAME = "nulKeyDB";
 const STORE_NAME = "vault";
+const VERIFY_SYMBOLS = [
+    "🍎", "🍌", "🍒", "🥝", "🍇", "🍉", "🍍", "🍑",
+    "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼",
+    "🚗", "🚕", "🚙", "🚌", "🏎️", "🚓", "🚑", "🚒",
+    "⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🏉", "🎱",
+    "🌍", "🌕", "☀️", "⭐", "☁️", "⛈️", "❄️", "🔥",
+    "🎸", "🎹", "🎺", "🎻", "🎨", "🎭", "🎬", "🎤",
+    "💡", "🔑", "🛡️", "💎", "🚀", "🚁", "⚓", "🛸",
+    "🍀", "🌈", "🍄", "🌵", "🌴", "🌊", "🌋", "🌪️"
+];
 
 let currentPassword = "";
 let timerInterval = null;
@@ -52,6 +62,53 @@ document.getElementById('pwLength').addEventListener('change', (e) => {
      let val = parseInt(e.target.value);
      if (val < 4) e.target.value = 4;
      if (val > 128) e.target.value = 128;
+});
+
+document.getElementById('masterPwd').addEventListener('input', async (e) => {
+    const val = e.target.value;
+    const buttons = document.querySelectorAll('.salt-btn');
+    
+    // Clear selection on any input change to avoid using salts from a different master pwd context
+    saltSelection = [];
+    buttons.forEach(btn => btn.classList.remove('selected'));
+
+    if (!val) {
+        const defaults = ["🦊", "⚡", "🐧", "👾", "🔥", "🦖", "💀", "🐙", "🐒", "🐝"];
+        buttons.forEach((btn, i) => btn.textContent = defaults[i]);
+        return;
+    }
+
+    const encoder = new TextEncoder();
+    
+    // Update Salt Keypad Emojis (10 unique symbols)
+    const saltData = encoder.encode("nulKey-salt-keypad" + val);
+    const saltHash = await window.crypto.subtle.digest('SHA-256', saltData);
+    const sHashArray = new Uint8Array(saltHash);
+    
+    const selected = [];
+    const usedIndices = new Set();
+    let hashIdx = 0;
+    
+    while (selected.length < 10 && hashIdx < sHashArray.length) {
+        const symbolIdx = sHashArray[hashIdx] % VERIFY_SYMBOLS.length;
+        if (!usedIndices.has(symbolIdx)) {
+            selected.push(VERIFY_SYMBOLS[symbolIdx]);
+            usedIndices.add(symbolIdx);
+        }
+        hashIdx++;
+    }
+    
+    // Fallback if not enough unique symbols found in hash (unlikely)
+    for (let i = 0; selected.length < 10 && i < VERIFY_SYMBOLS.length; i++) {
+        if (!usedIndices.has(i)) {
+            selected.push(VERIFY_SYMBOLS[i]);
+            usedIndices.add(i);
+        }
+    }
+
+    buttons.forEach((btn, i) => {
+        btn.textContent = selected[i];
+    });
 });
 
 // Expose functions to the global scope for inline event handlers (though we should ideally migrate those too)
