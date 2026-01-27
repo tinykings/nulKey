@@ -5,6 +5,16 @@ import sys
 
 # CONFIGURATION (Matching app.js)
 ITERATIONS = 1000000
+VERIFY_SYMBOLS = [
+    "🍎", "🍌", "🍒", "🥝", "🍇", "🍉", "🍍", "🍑",
+    "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼",
+    "🚗", "🚕", "🚙", "🚌", "🏎️", "🚓", "🚑", "🚒",
+    "⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🏉", "🎱",
+    "🌍", "🌕", "☀️", "⭐", "☁️", "⛈️", "❄️", "🔥",
+    "🎸", "🎹", "🎺", "🎻", "🎨", "🎭", "🎬", "🎤",
+    "💡", "🔑", "🛡️", "💎", "🚀", "🚁", "⚓", "🛸",
+    "🍀", "🌈", "🍄", "🌵", "🌴", "🌊", "🌋", "🌪️"
+]
 
 def format_password(bytes_data, length, opts):
     sets = []
@@ -16,23 +26,19 @@ def format_password(bytes_data, length, opts):
     if not sets:
         return ""
 
-    # JS logic: const targetLength = Math.max(length, sets.length);
     target_length = max(length, len(sets))
     all_chars = "".join(sets)
     res = []
     byte_idx = 0
 
-    # 1. Ensure one character from each selected set
     for s in sets:
         res.append(s[bytes_data[byte_idx] % len(s)])
         byte_idx += 1
 
-    # 2. Fill the rest with full charset
     while len(res) < target_length:
         res.append(all_chars[bytes_data[byte_idx] % len(all_chars)])
         byte_idx += 1
 
-    # 3. Deterministically shuffle using extra bytes
     for i in range(len(res) - 1, 0, -1):
         j = bytes_data[byte_idx] % (i + 1)
         res[i], res[j] = res[j], res[i]
@@ -40,25 +46,73 @@ def format_password(bytes_data, length, opts):
 
     return "".join(res[:length])
 
+def get_dynamic_keypad(master_pwd):
+    salt_data = "nulKey-salt-keypad" + master_pwd
+    salt_hash = hashlib.sha256(salt_data.encode('utf-8')).digest()
+    
+    selected = []
+    used_indices = set()
+    
+    for byte in salt_hash:
+        symbol_idx = byte % len(VERIFY_SYMBOLS)
+        if symbol_idx not in used_indices:
+            selected.append(VERIFY_SYMBOLS[symbol_idx])
+            used_indices.add(symbol_idx)
+        if len(selected) == 10:
+            break
+            
+    # Fallback
+    for i in range(len(VERIFY_SYMBOLS)):
+        if len(selected) == 10:
+            break
+        if i not in used_indices:
+            selected.append(VERIFY_SYMBOLS[i])
+            used_indices.add(i)
+            
+    return selected
+
 def main():
     print("--- nulKey CLI Generator ---")
     try:
         master = getpass.getpass("Master Password: ")
+        if not master:
+            print("Error: Master Password cannot be empty.")
+            return
+
+        # Generate dynamic keypad based on master password
+        keypad = get_dynamic_keypad(master)
         
-        print("Enter your 4 salt symbols (e.g., 🦊⚡🐧👾):")
-        salts_input = input("Symbols: ").strip()
-        # In Python 3, list(string) correctly splits by unicode characters (emojis)
-        salts = list(salts_input)
+        print("\nYour Dynamic Secret Pattern Symbols:")
+        for i, symbol in enumerate(keypad, 1):
+            print(f"{i}: {symbol}", end="  " if i % 5 != 0 else "\n")
         
+        print("\nSelect 4 symbols (enter numbers 1-10, e.g., '1234'):")
+        selection = input("Selection: ").strip()
+        
+        salts = []
+        try:
+            # Handle both space-separated and direct numbers
+            indices = []
+            if ' ' in selection:
+                indices = [int(x) - 1 for x in selection.split() if x.isdigit()]
+            else:
+                indices = [int(x) - 1 for x in list(selection) if x.isdigit()]
+            
+            for idx in indices:
+                if 0 <= idx < 10:
+                    salts.append(keypad[idx])
+        except ValueError:
+            pass
+
         if len(salts) != 4:
-            print("Warning: Expected exactly 4 symbols, but got {}. Results may differ from Web UI.".format(len(salts)))
+            print(f"Error: Expected exactly 4 unique symbols, but got {len(salts)}.")
+            return
 
         domain = input("Domain (e.g., google.com): ").lower().strip()
         username = input("Username: ").lower().strip()
         counter = input("Counter [1]: ").strip() or "1"
         length = int(input("Password Length [14]: ").strip() or "14")
 
-        # Default options matching typical UI state
         opts = {
             'useUpper': True,
             'useLower': True,
@@ -66,14 +120,11 @@ def main():
             'useSpecial': True
         }
 
-        # Deterministic salt string matching JS logic
         user_salt = "".join(sorted(salts))
         salt_str = "{}{}{}{}".format(user_salt, username, domain, counter)
         
         print("\nComputing ({} iterations)...".format(ITERATIONS))
         
-        # Calculate derived key length
-        # JS uses Math.max(length * 32, 1024) bits. 1024 bits = 128 bytes.
         dklen = max(length * 4, 128)
         
         derived_bits = hashlib.pbkdf2_hmac(
