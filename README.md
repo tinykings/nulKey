@@ -1,3 +1,6 @@
+<p align="center">
+  <img src="icon.png" alt="Blink Logo" width="256" />
+</p>
 <h1 align="center">nulKey</h1>
 
 <h3 align="center">A stateless password manager.</h3>
